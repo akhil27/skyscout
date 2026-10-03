@@ -6,7 +6,7 @@ import { getAuthToken } from 'deepspace'
  * they enforce auth, cooldowns, and owner-billing in one place.
  */
 export async function callAction<T = unknown>(name: string, params: Record<string, unknown> = {}): Promise<T> {
-  const token = getAuthToken()
+  const token = await getAuthToken()
   if (!token) throw new Error('Sign in required.')
   const res = await fetch(`/api/actions/${encodeURIComponent(name)}`, {
     method: 'POST',

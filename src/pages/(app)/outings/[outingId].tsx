@@ -229,7 +229,7 @@ export default function OutingDetailPage() {
           {/* Photo */}
           <section className="rounded-2xl border border-slate-800 bg-slate-900/60 p-5">
             <h2 className="font-semibold">Sky photo</h2>
-            {o.photoUrl ? <img src={o.photoUrl} alt="Crew sky photo" className="mt-3 rounded-xl" loading="lazy" /> : <p className="mt-2 text-sm text-slate-500">After the outing, upload one crew shot (shared app storage).</p>}
+            {o.photoUrl ? <img src={o.photoUrl} alt="Crew sky photo" className="mt-3 rounded-xl" loading="lazy" /> : <p className="mt-2 text-sm text-slate-500">After the outing, upload one crew shot. App-scoped photos have public URLs; do not upload private images.</p>}
             <label className="mt-3 block">
               <span className="text-xs text-slate-400">Upload JPG/PNG (≤10 MB)</span>
               <input
@@ -248,7 +248,10 @@ export default function OutingDetailPage() {
                   setPhotoBusy(true)
                   files
                     .upload(f, f.name, { key: `outings/${outingId}/${Date.now()}-${f.name}` })
-                    .then((r) => outingMut.putConfirmed(outingId, { photoUrl: r.url }))
+                    .then((r) => {
+                      if (!r.success || !r.url) throw new Error(r.error ?? 'Upload returned no image URL.')
+                      return outingMut.putConfirmed(outingId, { photoUrl: r.url })
+                    })
                     .then(() => success('Photo uploaded'))
                     .catch((err: unknown) => error('Upload failed', String(err instanceof Error ? err.message : err)))
                     .finally(() => setPhotoBusy(false))

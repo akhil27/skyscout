@@ -49,6 +49,7 @@ test('outing votes and notes sync between two real crew accounts', async ({ user
     await b.page.goto(detailUrl)
     await expect(a.page.getByRole('heading', { name: title, exact: true })).toBeVisible()
     await expect(b.page.getByRole('heading', { name: title, exact: true })).toBeVisible()
+    await expect(a.page.getByText(/scout.*here: Scout B/)).toBeVisible()
     const vote = a.page.getByRole('button', { name: '✅ Go', exact: true }).first()
     await expect.poll(() => vote.isDisabled()).toBe(false)
     await vote.click()
