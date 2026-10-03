@@ -2,7 +2,7 @@
 
 A shared stargazing planner: choose a place and 2–4 nights, compare forecast-based go/no-go scores, vote together, and get an organizer-generated viewing guide. Crew notes, presence, and a shared sky photo keep planning in one place.
 
-**Release status:** implementation repaired and locally checked; **not deployed or fully submission-ready yet**. DeepSpace authentication is missing on this machine, so `wrangler.toml` still contains its original `__APP_ID__` placeholder. The intended URL is `https://skyscout-akhil.app.space`; the URL probe returned **404** during this continuation. Do not present it as a live demo.
+**Live:** https://skyscout-akhil.app.space — deployed with serving and data plane confirmed. Immutable app ID: `app_01M4228SY73WA00M03RT8B1KRW`. Production organizer flow, two-user collaboration, R2 upload, and desktop/mobile Chrome checks passed on October 3, 2026. Email provider acceptance passed; inbox arrival and a future overnight alarm were not observed.
 
 ## Core flow
 
@@ -41,7 +41,7 @@ Catalog input/output contracts were inspected with `deepspace integrations info`
 | `nasa/apod` | Shared daily astronomy inspiration while planning. | Cached by UTC day in settings; only the organizer populates a missing cache. Signed-in crew reads the cached result. |
 | `email/send` | Deliver the decision/guide outside the app. | Organizer-only; recipient loaded from verified caller's users row, never accepted from browser params. One-minute spend reservation. |
 
-These are real platform calls, not simulated production integrations. **Live integration execution and email delivery remain unverified** because authentication/app registration is unavailable. No vendor SDK or API key is required; DeepSpace injects owner billing credentials. The email sender's provider acceptance must be checked in the first live run.
+All four integrations executed successfully through the real production app. No vendor SDK or API key is required; DeepSpace injects owner billing credentials. Email sender/provider acceptance was verified; inbox delivery is not claimed.
 
 ## Main tradeoff
 
@@ -61,7 +61,7 @@ npx deepspace app init          # mints the real immutable ID; never hand-write 
 npx deepspace dev start
 ```
 
-Normal browser login needs an interactive terminal. The agent shell's login attempt refused `interactive_required`. Run login in your own terminal; do not paste passwords or JWTs into chat/source files. For an operator-managed headless environment, consult `npx deepspace auth login --help` for supported credential transport.
+Browser login needs an interactive terminal. The owner completed it before registration; the agent verified the authenticated developer identity. Do not paste passwords or JWTs into chat/source files. Consult `npx deepspace auth login --help` for supported headless credential transport.
 
 ```bash
 npm run type-check
@@ -86,18 +86,22 @@ npx deepspace releases
 npx deepspace logs --follow --json
 ```
 
-DeepSpace-source deploys require a real app ID and a clean committed checkout. The starting repository has no commits or remote; this continuation leaves the source uncommitted rather than claiming a release with a placeholder identity. CLI registration may create its own initial checkpoint. Never use a fake ID to force a successful build.
+DeepSpace-source deploys require a real app ID and a clean committed checkout. Registration created the initial checkpoint, and the runtime repair commit is `a7912e474117a701a5065ec25bf952bfcc236679`. The deployment claimed DeepSpace source and installed its `space` remote. Never use a fake ID to force a successful build.
 
 Before submitting, test the **returned release URL**, not merely the intended name: sign in as organizer, create/select location, refresh forecast, generate guide, send reminder, open a second signed-in crew browser to vote/post, upload a photo, reload and verify persistence, inspect job/cron status and worker logs. Check owner credits and email sender configuration if a real call refuses. Record the actual results in `SUBMISSION.md`.
 
-## Validation evidence from this continuation
+## Final validation evidence
 
 - Typecheck, lint, and 24 unit/prerender/action-contract tests passed.
-- Playwright discovery succeeded: 13 tests in three spec files. Discovery is **not execution**.
+- Real local Playwright execution passed: **13/13**, no skips. Two distinct test accounts created an outing, changed votes, posted notes, observed presence, and deleted their test outing.
 - Actual static landing markup/CSS was rendered in installed Chrome at 390×844 and 1440×1000: heading, planner CTA destination, theme CSS, no horizontal overflow, no page errors passed. Screenshots are local ignored artifacts in `.deepspace/verification/`.
-- Full Vite build refused because the app has not been registered.
-- Real dev/test/deploy commands refused `not_authenticated`; login action refused `interactive_required`.
-- Intended production URL probe returned 404. Authenticated planner, real integrations, multi-user runtime, uploads, email and deployed cron/job execution are **not yet verified**.
+- Full production Vite build passed, including worker/client assets and static prerender.
+- `deepspace deploy` confirmed serving/data plane at the live URL; runtime code shipped from `a7912e4`, release `rel_01M4230EW115ZZV1PXDT3ETJQT`.
+- Real local and production organizer flows passed: geocoding → create → weather → full scout JobRoom/OpenAI guide → email acceptance → reload persistence. NASA APOD succeeded on home.
+- Production Chrome passed at 1440×1000 and 390×844; signed-out pages had no page errors/overflow. Authenticated detail at mobile size showed the real guide, votes and photo without horizontal overflow.
+- Two production crew accounts verified vote changes, note sync, presence and reload persistence. R2 uploaded PNG bytes returned 200/image/png and remained visible after reload.
+- Production CronRoom exposed its schedule and a manually triggered nightly refresh returned successful history. Logs recorded `[cron] nightly-refresh ok 1067ms`.
+- Email inbox arrival and a future scheduled overnight alarm were not observed. Job cancellation/restart recovery were not separately exercised.
 
 See `SUBMISSION.md` for handoff and remaining release gates.
 
@@ -109,9 +113,9 @@ A targeted 85-file source/test/public/documentation scan found no credential-lik
 - Dates mean 9pm in the creator's browser timezone, displayed in the form; no location-timezone lookup. Confirm this convention for a distant destination.
 - The current forecast catalog supports location/q strings, not lat/lon fields. Coordinates aid guide context; forecast lookup uses the selected city/state/country. Verify ambiguous provider matching live.
 - Query views are bounded (home 50 outings, 200 votes, 100 comments); no pagination. Overnight refresh is capped at 20 eligible outings among the first 100.
-- Photos are shared app storage. Replaced/deleted outing photos are not automatically garbage-collected. MIME/size checks in the UI supplement platform storage validation; they are not a private-photo policy.
+- Photos are public, app-scoped storage; their URLs are world-readable. Replaced/deleted outing photos are not automatically garbage-collected. MIME/size checks in the UI supplement platform storage validation; they are not a private-photo policy.
 - Reservation/cache settings and app owner administrators are trusted. Fixed-window limits are intentionally simple, not per-user fine-grained quotas.
-- Production app registration, build, deploy and important-flow verification remain release blockers, not optional future work.
+- No deployment or critical-flow blocker remains. Inbox delivery, overnight alarm observation and job cancel/recovery tests are additional verification work; do not infer them from API acceptance.
 
 ## Important files
 
