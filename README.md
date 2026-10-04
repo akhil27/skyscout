@@ -4,6 +4,8 @@ A shared stargazing planner: choose a place and 2–4 nights, compare forecast-b
 
 **Live:** https://skyscout-akhil.app.space — deployed with serving and data plane confirmed. Immutable app ID: `app_01M4228SY73WA00M03RT8B1KRW`. Production organizer flow, two-user collaboration, R2 upload, and desktop/mobile Chrome checks passed on October 3, 2026. Email provider acceptance passed; inbox arrival and a future overnight alarm were not observed.
 
+**GitHub mirror for review:** https://github.com/akhil27/skyscout — source of truth remains the DeepSpace cloud repo (`space` remote, revision 1, release `rel_01M4230EW115ZZV1PXDT3ETJQT`). GitHub holds a copy for PR review only; deploys still ship from the clean DeepSpace-source checkout and carry the DeepSpace commit lineage.
+
 ## Core flow
 
 1. Open `/home` and sign in. Create an outing with a city/state/country and 2–4 upcoming dates.
@@ -76,7 +78,7 @@ The Playwright suite includes a real two-user create → vote → change vote �
 
 ## Deployment
 
-Keep DeepSpace cloud source as the default; do not attach GitHub unasked. After successful registration and final checks, review and commit the checkout, then deploy from a clean worktree:
+DeepSpace cloud source is the deploy authority (`space` remote); GitHub `origin` (https://github.com/akhil27/skyscout) is a review mirror only and does not change the latched source. After successful registration and final checks, review and commit the checkout, then deploy from a clean worktree:
 
 ```bash
 npx deepspace status --json
@@ -87,6 +89,13 @@ npx deepspace logs --follow --json
 ```
 
 DeepSpace-source deploys require a real app ID and a clean committed checkout. Registration created the initial checkpoint, and the runtime repair commit is `a7912e474117a701a5065ec25bf952bfcc236679`. The deployment claimed DeepSpace source and installed its `space` remote. Never use a fake ID to force a successful build.
+
+To sync the GitHub review mirror (does not deploy):
+
+```bash
+git remote -v  # origin -> https://github.com/akhil27/skyscout.git, space -> DeepSpace cloud repo
+git push origin master
+```
 
 Before submitting, test the **returned release URL**, not merely the intended name: sign in as organizer, create/select location, refresh forecast, generate guide, send reminder, open a second signed-in crew browser to vote/post, upload a photo, reload and verify persistence, inspect job/cron status and worker logs. Check owner credits and email sender configuration if a real call refuses. Record the actual results in `SUBMISSION.md`.
 
