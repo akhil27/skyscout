@@ -15,13 +15,35 @@ export interface GoScoreBreakdown {
   reason: string
 }
 
-/** Approximate moon illumination 0..1 for a date (synodic cycle). Good enough for planning. */
-export function moonIllumination(date: Date): number {
+/** Shared approximate lunar context, not a location-specific ephemeris. */
+export function moonContext(date: Date): { illumination: number; phase: string } {
   const synodic = 29.53058867
   const ref = Date.UTC(2000, 0, 6, 18, 14) / 86400000
   const days = date.getTime() / 86400000 - ref
   const age = ((days % synodic) + synodic) % synodic
-  return (1 - Math.cos((2 * Math.PI * age) / synodic)) / 2
+  const illumination = (1 - Math.cos((2 * Math.PI * age) / synodic)) / 2
+  const waxing = age < synodic / 2
+  const phase = !Number.isFinite(illumination) ? 'unavailable'
+    : illumination < 0.01 ? 'new moon'
+      : illumination > 0.99 ? 'full moon'
+        : Math.abs(illumination - 0.5) < 0.02 ? (waxing ? 'first quarter' : 'last quarter')
+          : `${waxing ? 'waxing' : 'waning'} ${illumination < 0.5 ? 'crescent' : 'gibbous'}`
+  return { illumination, phase }
+}
+
+/** Approximate illumination 0..1; preserves the existing scoring calculation. */
+export function moonIllumination(date: Date): number {
+  return moonContext(date).illumination
+}
+
+/** Reject explicit contradictory lunar claims; do not rewrite model prose or invent facts. */
+export function guideMatchesMoon(text: string, moon: ReturnType<typeof moonContext>): boolean {
+  const claims = text.toLowerCase().match(/\b(?:waxing|waning)(?:\s+(?:crescent|gibbous))?\b|\b(?:new|full) moon\b|\b(?:first|last|third) quarter\b/g) ?? []
+  const phase = moon.phase.replace('last quarter', 'third quarter')
+  return claims.every((claim) => {
+    const normalized = claim.replace('last quarter', 'third quarter')
+    return normalized === phase || ((normalized === 'waxing' || normalized === 'waning') && phase.startsWith(normalized))
+  })
 }
 
 function descScore(description: string): number {

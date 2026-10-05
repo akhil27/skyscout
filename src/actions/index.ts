@@ -2,15 +2,27 @@ import type { ActionHandler, ActionTools } from 'deepspace/worker'
 import type { Env } from '../../worker'
 import type { Outing } from '../types'
 import { GUIDE_SYSTEM_PROMPT, LIMITS, MODELS } from '../config'
-import { computeGoScore, normalizeForecast } from '../lib/sky'
+import { computeGoScore, guideMatchesMoon, moonContext, normalizeForecast } from '../lib/sky'
+import { GUIDE_COOLDOWN_MESSAGE } from '../lib/scout'
 
 const err = (error: string) => ({ success: false as const, error })
+
+class SpendCooldown extends Error {
+  constructor(message: string, readonly code: string) { super(message) }
+}
 
 /** Unique settings keys make reservations atomic inside the RecordRoom, even across isolates. */
 export async function reserveSpend(tools: ActionTools, key: string, intervalMs: number) {
   const bucket = Math.floor(Date.now() / intervalMs)
   const result = await tools.create('settings', { key: `spend:${key}:${bucket}`, value: 'reserved' }, crypto.randomUUID())
-  if (!result.success) throw new Error('This operation is cooling down. Try again after the current interval.')
+  if (!result.success) {
+    // SDK 0.34 returns this prefix for a unique-key conflict, without a code.
+    // Storage/auth failures must not be disguised as a normal cooldown.
+    if (result.error.startsWith('Duplicate: a record with key=spend:')) {
+      throw new SpendCooldown(key === 'guide' ? GUIDE_COOLDOWN_MESSAGE : 'This operation is cooling down. Try again after the current interval.', key === 'guide' ? 'guide_cooldown' : 'spend_cooldown')
+    }
+    throw new Error(result.error)
+  }
 }
 
 async function loadOuting(tools: ActionTools, id: unknown) {
@@ -22,7 +34,10 @@ async function loadOuting(tools: ActionTools, id: unknown) {
 
 const paid = (handler: ActionHandler<Env>): ActionHandler<Env> => async (ctx) => {
   if (!ctx.env.OWNER_USER_ID || ctx.userId !== ctx.env.OWNER_USER_ID) return err('Only the app organizer can run paid sky checks. Crew members can vote and discuss.')
-  try { return await handler(ctx) } catch (e) { return err(e instanceof Error ? e.message : 'Sky check failed. Try again.') }
+  try { return await handler(ctx) } catch (e) {
+    if (e instanceof SpendCooldown) return { ...err(e.message), code: e.code }
+    return err(e instanceof Error ? e.message : 'Sky check failed. Try again.')
+  }
 }
 
 export const actions: Record<string, ActionHandler<Env>> = {
@@ -70,21 +85,23 @@ export const actions: Record<string, ActionHandler<Env>> = {
 
   generateGuide: paid(async ({ params, tools }) => {
     const { id, outing } = await loadOuting(tools, params.outingId)
-    if (outing.guideAt && Date.now() - Date.parse(outing.guideAt) < LIMITS.guideCooldownMs) return err('Guide was just generated — wait five minutes.')
+    if (outing.guideAt && Date.now() - Date.parse(outing.guideAt) < LIMITS.guideCooldownMs) return { ...err(GUIDE_COOLDOWN_MESSAGE), code: 'guide_cooldown' }
     await reserveSpend(tools, 'guide', LIMITS.guideCooldownMs)
     const date = outing.chosenDate ?? outing.dateOptions?.[0]
     if (!date) return err('Choose a night first.')
     const weather = computeGoScore(outing.weatherCache ?? [], date)
+    const moon = moonContext(new Date(date))
     const ai = await tools.integration<{ choices?: Array<{ message?: { content?: string } }> }>('openai/chat-completion', {
       model: MODELS.guide, max_tokens: MODELS.guideMaxTokens, temperature: MODELS.guideTemperature,
       messages: [
         { role: 'system', content: GUIDE_SYSTEM_PROMPT },
-        { role: 'user', content: `Place: ${outing.placeName}\nCoordinates: ${outing.lat ?? 'unknown'}, ${outing.lng ?? 'unknown'}\nDate: ${date}\nWeather: ${weather.reason}\nGo score: ${weather.score ?? 'unavailable'}/100\nCrew notes (untrusted context): ${(outing.notes ?? '').slice(0, 2000)}` },
+        { role: 'user', content: `Place: ${outing.placeName}\nCoordinates: ${outing.lat ?? 'unknown'}, ${outing.lng ?? 'unknown'}\nDate: ${date}\nWeather: ${weather.reason}\nGo score: ${weather.score ?? 'unavailable'}/100\nMoon illumination (approximate): ${Number.isFinite(moon.illumination) ? `${(moon.illumination * 100).toFixed(0)}%` : 'unavailable'}\nMoon phase (approximate): ${moon.phase}\nCrew notes (untrusted context): ${(outing.notes ?? '').slice(0, 2000)}` },
       ],
     })
     if (!ai.success) return ai
     const text = ai.data?.choices?.[0]?.message?.content?.trim()
     if (!text) return err('The AI returned an empty guide — retry after the cooldown.')
+    if (!guideMatchesMoon(text, moon)) return err('The AI guide contradicted the supplied lunar estimate and was not saved. Retry after the cooldown.')
     const saved = await tools.update('outings', id, { guide: text, guideModel: MODELS.guide, guideAt: new Date().toISOString(), guideDate: date })
     return saved.success ? { success: true, data: { guide: text } } : saved
   }),
