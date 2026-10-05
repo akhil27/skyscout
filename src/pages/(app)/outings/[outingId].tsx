@@ -12,6 +12,7 @@ import { GoBadge } from '@/components/GoBadge'
 import { PresenceBar } from '@/components/PresenceBar'
 import { callAction } from '@/lib/callAction'
 import { computeGoScore, formatScoreDate } from '@/lib/sky'
+import { scoutStatusText, type ScoutResult } from '@/lib/scout'
 import { SCOPE_ID } from '@/constants'
 import type { Outing, OutingComment, Vote } from '@/types'
 
@@ -34,7 +35,7 @@ export default function OutingDetailPage() {
   const outingMut = useMutations<Outing>('outings')
   const voteMut = useMutations<Vote>('votes')
   const commentMut = useMutations<OutingComment>('outing_comments')
-  const jobs = useJobs<{ outingId: string }>(SCOPE_ID)
+  const jobs = useJobs<{ outingId: string }, ScoutResult>(SCOPE_ID)
   const files = useR2Files({ scope: 'app' })
 
   const [busy, setBusy] = useState<string | null>(null)
@@ -111,7 +112,7 @@ export default function OutingDetailPage() {
             </div>
             <p className="mt-2 text-sm text-slate-400">{forecast.reason}</p>
             {!canScout ? <p className="mt-2 text-xs text-amber-200">The organizer refreshes weather and AI; crew members can vote and post notes.</p> : null}
-            {latestJob ? <p role="status" className="mt-2 text-xs text-slate-400">Full scout: {latestJob.status}{latestJob.error ? ` — ${latestJob.error}` : ''} {scoutJob?.progressMessage ?? ''}</p> : null}
+            {latestJob ? <p role="status" className="mt-2 text-xs text-slate-400">{scoutStatusText(latestJob)}</p> : null}
             {o.weatherAt ? <p className="mt-1 text-xs text-slate-500">Updated {new Date(o.weatherAt).toLocaleString()}</p> : <p className="mt-1 text-xs text-slate-500">No forecast yet — refresh to attach one.</p>}
             {o.weatherCache?.length ? (
               <ul className="mt-3 grid gap-1.5 text-sm sm:grid-cols-2">

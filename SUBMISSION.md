@@ -1,96 +1,82 @@
-# SkyScout — DeepSpace evaluation submission
+# SkyScout — DeepSpace Build Exercise
 
-## Live app
+**Live app:** https://skyscout-akhil.app.space
 
-**https://skyscout-akhil.app.space**
+**Public source:** https://github.com/akhil27/skyscout
 
-- Immutable app ID: `app_01M4228SY73WA00M03RT8B1KRW`
-- Owner CLI identity verified: Akhil Indraganti, developer account.
-- Source authority: DeepSpace cloud repository (`space` remote), not GitHub.
-- Runtime release commit: `a7912e474117a701a5065ec25bf952bfcc236679`.
-- Initial verified release: `rel_01M4230EW115ZZV1PXDT3ETJQT`, serving/data plane confirmed, retained rollback bundle, clean worktree.
-- Registration, build, real tests and live verification completed October 3, 2026.
-- Exercise deadline: October 5, 2026, 11:59 PM Eastern.
+**App ID:** `app_01M4228SY73WA00M03RT8B1KRW`
 
-## Product and focused scope
+## What I Built
 
-SkyScout helps a shared crew choose a stargazing night. Create an outing with a city and 2–4 nights; compare weather-based scores; vote live; ask the organizer for a viewing guide; send the decision to the organizer's email; discuss logistics and upload a shared sky photo.
+SkyScout helps a shared crew choose a stargazing night: create an outing with a place and 2–4 nights, compare forecast-based scores, vote together, generate an AI viewing guide, discuss logistics, upload a sky photo, and send the organizer a reminder.
 
-One app-scoped crew workspace keeps the five-day scope realistic. There are no payments, video, calendar OAuth, private groups, or second database merely to inflate an integration count.
+React 19/Vite/Generouted serves the planner; a Hono Cloudflare worker uses DeepSpace SDK 0.34.0. The public landing is static, while authenticated routes share an app-scoped realtime workspace.
 
-## Meaningful integrations — real production results
+## DeepSpace Integrations and Why
 
-| Integration / primitive | Purpose | What actually executed |
-| --- | --- | --- |
-| OpenWeatherMap geocoding + forecast | Pin a city and drive go/no-go | Organizer browser selected Joshua Tree, California, US; forecast action succeeded and score/data persisted. |
-| OpenAI `gpt-4o-mini` | Selected-night advice/checklist | Full scout JobRoom ran to `succeeded`; generated guide displayed and survived reload. |
-| NASA APOD | Daily shared astronomy inspiration | Production home `getApod` returned success and cached the real NASA response. |
-| `email/send` | Reminder outside the planner | Production reminder action returned success; platform usage ledger marked calls completed. **Inbox arrival was not observed.** |
-| RecordRoom | SQLite operational records + live sync | Production creation, two-account vote changes, notes and reload persistence passed. |
-| PresenceRoom | Ephemeral co-planning peers | Distinct production crew browsers observed peers on the same outing. |
-| Platform R2 | Shared sky image bytes | Production PNG upload succeeded, image rendered, request returned 200/image/png, URL persisted through reload. App-scoped URLs are public. |
-| CronRoom | Bounded upcoming-weather refresh | Production schedule snapshot and manual nightly trigger succeeded; history confirmed success; logs recorded `nightly-refresh ok 1067ms`. Future overnight alarm not observed. |
-| JobRoom | Durable full scout and progress | Production full scout advanced to `succeeded`, generated/saved a real AI guide. Cancellation/restart recovery were not separately exercised. |
-
-All checks used actual auth, app routes, hooks, records, WebSockets and platform integrations. Production checks did not mock services. Paid calls were bounded and authorized by the owner. Test-account passwords and existing owner session credentials stayed in the SDK's local secure storage, never in source or CLI arguments.
-
-## Architecture and tradeoffs
-
-React 19/Vite/Generouted frontend; Hono Cloudflare worker; DeepSpace SDK 0.34.0. Static landing mounts no auth/data providers. `(app)/_layout.tsx` owns the provider boundary; records key to immutable `app:${APP_ID}`.
-
-Schemas retain required `users`, add outings/votes/comments, and use server-side permissions. Vote identity is `userBound`/immutable with composite `uniqueOn` enforcement. Confirmed mutations wait for server acceptance before navigation/success UX. Privileged action tools intentionally bypass RBAC; destructive deletion checks creator/owner before cascading.
-
-**Main tradeoff:** a shared crew workspace rather than private multi-tenant groups. Filtering comments by outing ID is query scope, not privacy. All signed-in members can read crew outings. Organizer-only paid actions/jobs/cron triggering keep random accounts from spending owner credits; crew can create, vote and discuss. Unique settings keys provide fixed-window spend reservations; NASA results cache by UTC day.
-
-Forecasts use the platform catalog's place-name lookup and three-hour/five-day horizon. Scores use descriptions/humidity/approximate lunar illumination; distant nights are unavailable, not zero/No-go. Dates mean 9pm in the creator browser timezone. Guides are date-tagged and invalidated when the selected night changes. No exact ephemeris or safety prediction is promised.
-
-## What existed, and what the coding agent did
-
-Preserved the existing SkyScout scaffold, landing, home/detail UI, schemas, scoring, action skeletons, presence, uploads, cron/job and tests; no restart/redesign.
-
-The agent repaired forecast horizon/date handling, vote uniqueness, spend/auth boundaries, reminder recipient safety, checked persistence, guide invalidation, UI loading/error states, explicit place selection, deletion cleanup and consistent theming. It fixed the cron SDK response contract, then used real tests to discover/fix the missing `await getAuthToken()` and verified that cleanup/actions now work. Uploads now check the SDK success envelope; cron writers are owner-only.
-
-The agent verified owner identity, registered the server-minted app, created exactly two usable test accounts with generated stdin passwords, ran the full build/test suite, deployed a clean commit, and used installed Chrome to drive real production organizer/crew flows. It inspected releases, runtime logs and integration usage. The human completed initial CLI login; **no human/manual inbox verification or overnight observation is claimed**.
-
-## Checks performed
-
-| Check | Result |
+| Integration | Product role and recorded production evidence |
 | --- | --- |
-| Full production build | Passed worker/client builds and static prerender |
-| Typecheck | Passed |
-| ESLint | Passed scaffold's Rules of Hooks checks |
-| Unit/prerender/action tests | **24/24 passed** |
-| `deepspace test run all --json` | **13/13 browser tests passed**, no skips, plus unit suite |
-| Two-user local planner flow | Passed create → vote → change vote → note/presence sync → cascade delete |
-| Real local organizer integrations | Geocode/weather/NASA/OpenAI job/email acceptance passed |
-| Production organizer flow | Passed through real browser actions; guide persisted after reload |
-| Production two-user flow | Votes, notes, presence and persistence passed |
-| Production R2 | Upload/render/200 image bytes/type/reload passed |
-| Production cron/job | Manual cron successful history/log; scout job succeeded |
-| Installed Chrome 1440×1000 / 390×844 | Live landing/planner content, mobile detail, no horizontal overflow; signed-out pages no JS page errors |
-| Git/credential review | 103 tracked files scanned before release: no JWT/private key/vendor-key/credential literals or tracked `.dev.vars`/verification artifacts |
-| Deployment | `serving: confirmed`, `dataPlane: confirmed`, clean DeepSpace-source release |
+| RecordRoom | Persistent outings, votes, and notes; two-user sync and reload persistence passed. |
+| PresenceRoom | Live co-planning peers; distinct crew browsers observed each other. |
+| JobRoom | Durable Full Scout progress and guide generation; real production job reached `succeeded`. |
+| CronRoom | Bounded nightly forecast refresh; schedule and manual run returned successful history/logs (`nightly-refresh ok 1067ms`). |
+| R2 | Shared sky photo; PNG upload, rendered image, HTTP 200/image/png, and persisted URL passed. |
+| OpenWeatherMap | Geocoding and forecasts; organizer selected Joshua Tree, refreshed weather, and persisted scores. |
+| OpenAI `gpt-4o-mini` | Selected-night guide/checklist; real Full Scout guide displayed and survived reload. |
+| NASA APOD | Daily astronomy inspiration; production response was cached and shared. |
+| Email | Organizer reminder outside the app; provider/API acceptance passed, not inbox delivery. |
 
-The first real two-user run failed deletion authorization because a Promise was sent as Bearer token. The helper was fixed, and the complete affected suite was rerun successfully. No test assertion was weakened or skipped to pass.
+These recorded production checks used real auth, records, WebSockets, and integration calls, not mocked services. Paid operations remain organizer-only and bounded. No vendor credentials are committed.
 
-## Repository and important files
+## Main Tradeoff
 
-- `worker.ts`: Durable Object manifest, auth/realtime/actions and runtime assembly.
-- `src/schemas.ts`, `src/schemas/{outings,votes,outing-comments,users,admin}-schema.ts`: data/RBAC/uniqueness.
-- `src/actions/index.ts`, `src/server/{action-routes,http-routes,realtime-routes}.ts`: checked privileged work, paid boundary, verified identity.
-- `src/lib/{callAction,sky}.ts`, `src/config.ts`: JWT action client, pure scoring/date/provider validation, prompt/model/caps.
-- `src/cron.ts`, `src/jobs.ts`: scheduled/durable orchestration.
-- `src/components/{NewOutingForm,OutingCard,ApodCard,PresenceBar}.tsx`, `src/pages/(app)/outings/[outingId].tsx`: main product flow.
-- `tests/{smoke,api,collab}.spec.ts`, unit tests: static/auth/API/two-user/regression coverage.
-- `README.md`: setup/development/deployment and detailed architecture/limits.
+**A shared crew workspace rather than private multi-tenant groups.** All signed-in members can read crew outings and notes; outing filters scope a view, not privacy. Organizer-only paid actions prevent crew accounts from spending owner credits.
 
-Screenshots and verification evidence are local ignored `.deepspace/verification/` artifacts, not committed credentials or production fixture data. Test records use `__test-` prefixes; the live verification outing/photo are removed after checks rather than left as crew data.
+Scoring is intentionally approximate: cloud descriptions, humidity, and a synodic-cycle lunar estimate—not an ephemeris or safety prediction. Dates mean 9pm in the creator's browser timezone. Forecasts are bounded to their actual five-day horizon; photos have public app-scoped URLs.
 
-## Remaining limitations — no deployment blocker
+## What the Coding Agent Did
 
-- Email API/provider acceptance verified; inbox receipt not verified.
-- Cron schedule/manual execution verified; future overnight alarm not observed.
-- Job success verified; cancellation/recovery remain additional tests.
-- Shared crew, not private groups; photos intentionally public URLs.
-- Approximate astronomy, browser-timezone dates, place-name weather lookup and bounded query/cron sizes.
-- Replaced photo garbage collection and fine-grained quotas are future work.
+The agent preserved the existing product and integrations rather than redesigning it. Earlier work repaired forecast/date handling, vote uniqueness, authorization/spending boundaries, guide invalidation, reminders, deletion cleanup, persistence feedback, and SDK response/token handling. It ran local and production checks and deployed the original clean release after the owner authenticated.
+
+Submission cleanup adds two narrow fixes:
+
+- **Lunar context:** the previous guide prompt included illumination only indirectly in weather prose and never supplied phase. It now receives explicit approximate illumination and phase derived from the same cycle as scoring, including when weather is unavailable. The system prompt prohibits independent phase inference or overrides from crew notes; an explicit contradictory phase claim is rejected before saving, preserving any previous guide. No schema, scoring formula, or astronomy dependency changed.
+- **Full Scout cooldown:** the previous job threw the expected five-minute guide refusal, creating a real `failed` JobRoom row. It now returns a structured `cooldown` request outcome, displayed as “Guide generation is on cooldown. Try again in a few minutes.” This does not claim a new guide was generated. Only the exact historical cooldown message receives compatibility display handling; genuine provider/storage/auth/job failures remain errors. Duplicate spend reservations retain cooldown protection, while unrelated storage failures are no longer mislabeled cooldowns.
+
+README and this submission note now distinguish the public GitHub repository from the unchanged DeepSpace deployment authority. No production deployment is part of submission cleanup.
+
+## Verification and Personal Review
+
+### Recorded original release evidence — October 3, 2026
+
+- Production build, typecheck, ESLint, and **24/24 unit/prerender/action tests** passed.
+- **13/13 real browser tests** passed, no skips, including two-user create → vote → change vote → notes/presence sync → delete.
+- Real local and production organizer flows covered geocoding, weather, OpenAI/JobRoom, NASA APOD, and email provider acceptance.
+- Production crew browsers verified votes, notes, presence, and reload persistence; R2 upload/render/reload passed.
+- Chrome at 1440×1000 and 390×844 showed real landing/planner/detail content without horizontal overflow; signed-out pages had no page errors.
+- Credential/Git review found no tracked secret files, credential literals, or local verification artifacts. Scans are heuristic, not guarantees.
+- Release `rel_01M4230EW115ZZV1PXDT3ETJQT` confirmed serving and data plane; runtime commit `a7912e474117a701a5065ec25bf952bfcc236679` retains DeepSpace-source lineage and rollback evidence. Read-only release inspection during cleanup also confirmed the latest existing release `rel_01M423AYZEN5B7WH0BTQ4Z6GCF` at `516145dc46d8f5fc813f28e48755acfaff1e10f9` (October 3, 2026); no new release was made.
+
+The owner personally completed CLI login and subsequently inspected an outing, reporting the contradictory lunar advice and misleading Full Scout failure. The broader browser/integration evidence above was agent-driven; it is not represented as additional human/manual verification.
+
+### Submission cleanup — local verification
+
+- Typecheck, ESLint, `test:unit`, `validate`, and production build passed; **48/48 unit/prerender/action/job regression tests** now cover lunar phase direction, shared illumination, selected-date prompts, cooldown protection, normal guide generation, and genuine errors.
+- The full real-runtime browser suite passed again: **13/13**, no skips, including two-user creation/voting/notes/presence and deletion.
+- Real local Chrome organizer flow reproduced **moon 29%** and generated **waning crescent** advice. Normal OpenAI guide generation, JobRoom cooldown display, unchanged saved guide, reload persistence, and Full Scout success after waiting the real five-minute cooldown passed.
+- After the final code edits, the full browser suite passed again. Real local R2 upload/render/HTTP image bytes/reload and manual CronRoom execution/history passed. A deliberately missing test record produced a genuine JobRoom `failed` error (`Record not found`), not cooldown. Created test outings were deleted through authorized app actions.
+- The first supplemental organizer attempt hit a stopped local server; it was restarted and the complete flow rerun successfully. Live model output also exposed an unsupported moonset statement, so the prompt was tightened and phase-validation regression tests added; all required checks were rerun. This does not establish that arbitrary AI prose can never be wrong.
+- R2/cron checks use the local app runtime with real platform integrations; production records/configuration/releases were not changed. Local verification scripts/results remain ignored and are not submission artifacts.
+
+## What Remains Unverified / Future Work
+
+- Email inbox arrival was not observed; provider acceptance is not delivery confirmation.
+- A future overnight cron alarm was not observed; schedule/manual execution is the available evidence.
+- Job cancellation/restart recovery was not separately exercised end-to-end. Unit cancellation coverage does not establish crash recovery.
+- Approximate astronomy and AI advice remain imperfect; no exact positions, moonrise/set, or visibility guarantee is claimed.
+- Private crews, destination-timezone lookup, pagination, replaced-photo garbage collection, and fine-grained quotas are future work.
+- New code fixes are local until a separately authorized DeepSpace production deployment. Existing stored guides are not automatically rewritten.
+
+## Source and Release Model
+
+GitHub is the public project/submission repository. A GitHub push does **not** deploy the app. The existing app remains latched to DeepSpace source, revision 1, with the `space` remote and commit-first releases. Source authority, app ID, production configuration, and release were not changed by submission cleanup. See [README.md](README.md) for development and deployment commands.
